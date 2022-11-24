@@ -717,6 +717,42 @@ class Normalize:
 
 
 @PIPELINES.register_module()
+class NormalizeDepth:
+    """Normalize the depth image.
+
+    Added key is "depth_norm_cfg".
+
+    Args:
+        mean (sequence): Mean value.
+        std (sequence): Std value.
+    """
+
+    def __init__(self, mean, std):
+        self.mean = np.array(mean, dtype=np.float32)
+        self.std = np.array(std, dtype=np.float32)
+
+    def __call__(self, results):
+        """Call function to normalize images.
+
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: Normalized results, 'depth_norm_cfg' key is added into
+                result dict.
+        """
+        results['depth'] = mmcv.imnormalize(results['depth'], self.mean, self.std, False)
+        results['depth_norm_cfg'] = dict(
+            mean=self.mean, std=self.std)
+        return results
+
+    def __repr__(self):
+        repr_str = self.__class__.__name__
+        repr_str += f'(mean={self.mean}, std={self.std})'
+        return repr_str
+
+
+@PIPELINES.register_module()
 class RandomCrop:
     """Random crop the image & bboxes & masks.
 

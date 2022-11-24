@@ -190,7 +190,11 @@ class CocoDataset(CustomDataset):
         else:
             gt_bboxes_ignore = np.zeros((0, 4), dtype=np.float32)
 
-        seg_map = img_info['filename'].rsplit('.', 1)[0] + self.seg_suffix
+        if isinstance(img_info['filename'], list):
+            fname = img_info['filename'][0]
+        else:
+            fname = img_info['filename']
+        seg_map = fname.rsplit('.', 1)[0] + self.seg_suffix
 
         ann = dict(
             bboxes=gt_bboxes,

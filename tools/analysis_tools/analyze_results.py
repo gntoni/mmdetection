@@ -115,6 +115,9 @@ class ResultVisualizer:
 
             # calc save file path
             filename = data_info['filename']
+            # if the filename comes from 'LoadMultiChannelImageFromFiles' take the first image.
+            if isinstance(filename, list):
+                filename = filename[0]
             if data_info['img_prefix'] is not None:
                 filename = osp.join(data_info['img_prefix'], filename)
             else:

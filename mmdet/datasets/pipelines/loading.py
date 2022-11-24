@@ -174,8 +174,11 @@ class LoadMultiChannelImageFromFiles:
         img = []
         for name in filename:
             img_bytes = self.file_client.get(name)
-            img.append(mmcv.imfrombytes(img_bytes, flag=self.color_type))
-        img = np.stack(img, axis=-1)
+            img_bytes = mmcv.imfrombytes(img_bytes, flag=self.color_type)
+            if len(img_bytes.shape) == 2:
+                img_bytes = np.expand_dims(img_bytes, -1).astype(np.float32)
+            img.append(img_bytes)
+        img = np.dstack(img)
         if self.to_float32:
             img = img.astype(np.float32)
 
@@ -184,14 +187,6 @@ class LoadMultiChannelImageFromFiles:
         results['img'] = img
         results['img_shape'] = img.shape
         results['ori_shape'] = img.shape
-        # Set initial values for default meta_keys
-        results['pad_shape'] = img.shape
-        results['scale_factor'] = 1.0
-        num_channels = 1 if len(img.shape) < 3 else img.shape[2]
-        results['img_norm_cfg'] = dict(
-            mean=np.zeros(num_channels, dtype=np.float32),
-            std=np.ones(num_channels, dtype=np.float32),
-            to_rgb=False)
         return results
 
     def __repr__(self):
@@ -199,6 +194,141 @@ class LoadMultiChannelImageFromFiles:
                     f'to_float32={self.to_float32}, '
                     f"color_type='{self.color_type}', "
                     f'file_client_args={self.file_client_args})')
+        return repr_str
+
+
+@PIPELINES.register_module()
+class LoadRGBDImageFromFiles:
+    """Load 4-channel images from a list of two files (colour and depth).
+
+    Required keys are "img_prefix" and "img_info" (a dict that must contain the
+    key "filename", which is expected to be a list of filenames).
+    Added or updated keys are "filename", "img", "img_shape",
+    "ori_shape" (same as `img_shape`), "pad_shape" (same as `img_shape`),
+    "scale_factor" (1.0) and "img_norm_cfg" (means=0 and stds=1).
+
+    Args:
+        to_float32 (bool): Whether to convert the loaded image to a float32
+            numpy array. If set to False, the loaded image is an uint8 array.
+            Defaults to False.
+        color_type (str): The flag argument for :func:`mmcv.imfrombytes`.
+            Defaults to 'color'.
+        file_client_args (dict): Arguments to instantiate a FileClient.
+            See :class:`mmcv.fileio.FileClient` for details.
+            Defaults to ``dict(backend='disk')``.
+    """
+
+    def __init__(self,
+                 to_float32=False,
+                 color_type='unchanged',
+                 file_client_args=dict(backend='disk')):
+        self.to_float32 = to_float32
+        self.color_type = color_type
+        self.file_client_args = file_client_args.copy()
+        self.file_client = None
+
+    def __call__(self, results):
+        """Call functions to load multiple images and get images meta
+        information.
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded images and meta information.
+        """
+
+        if self.file_client is None:
+            self.file_client = mmcv.FileClient(**self.file_client_args)
+
+        if results['img_prefix'] is not None:
+            filename = [
+                osp.join(results['img_prefix'], fname)
+                for fname in results['img_info']['filename']
+            ]
+        else:
+            filename = results['img_info']['filename']
+
+        assert len(filename) == 2, "Filename should be a list containing [rgb_image, depth_image]"
+
+        img_bytes = self.file_client.get(filename[0])
+        img = mmcv.imfrombytes(img_bytes, flag=self.color_type)
+
+        depth_bytes = self.file_client.get(filename[1])
+        depth = mmcv.imfrombytes(depth_bytes, flag=self.color_type)
+        if len(depth.shape) == 2:
+            depth = np.expand_dims(depth, -1).astype(np.float32)
+        if self.to_float32:
+            img = img.astype(np.float32)
+
+        results['filename'] = filename
+        results['ori_filename'] = results['img_info']['filename']
+        results['img'] = img
+        results['depth'] = depth
+        results['img_shape'] = img.shape
+        results['ori_shape'] = img.shape
+        results['img_fields'] = ['img', 'depth']
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'to_float32={self.to_float32}, '
+                    f"color_type='{self.color_type}', "
+                    f'file_client_args={self.file_client_args})')
+        return repr_str
+
+
+@PIPELINES.register_module()
+class MergeRGBD:
+    """
+    Required keys are 'input_image_key' and 'input_image_key' which
+    default to 'img' and 'depth' respectively.
+    By default updates 'img' with the merged tensor, but a new key
+    can be defined in 'output_key'
+
+    Args:
+        input_image_key (str): Key of the RGB image to be merged.
+        input_depth_key (str): Key of the Depth image to be merged.
+        output_key (str): Key where the result tensor will be stored.
+    """
+    def __init__(self,
+                 input_image_key='img',
+                 input_depth_key='depth',
+                 output_key='img'):
+
+        self.input_image_key = input_image_key
+        self.input_depth_key = input_depth_key
+        self.output_key = output_key
+
+    def __call__(self, results):
+        """ Call function to merge an RGB image and a Depth image
+         into a single tensor
+
+        Args:
+            results (dict): Result dict from :obj:`mmdet.CustomDataset`.
+
+        Returns:
+            dict: The dict contains loaded images and meta information.
+        """
+        assert len(results[self.input_depth_key].shape) in [2, 3], 'Input depth shape in MergeRGBD should be WxHx1'
+        if len(results[self.input_depth_key].shape) == 2:
+            results[self.input_depth_key] = np.expand_dims(results[self.input_depth_key], -1)
+
+        assert len(results[self.input_image_key].shape) == 3 and \
+               results[self.input_image_key].shape[2] == 3, 'Input image shape in MergeRGBD should be WxHx3'
+
+        assert results[self.input_image_key].dtype == results[self.input_image_key].dtype, \
+            "Depth and RGB should be the same data type"
+
+        results[self.output_key] = np.dstack([results[self.input_image_key], results[self.input_depth_key]])
+        results['img_fields'].remove(self.input_depth_key)
+        return results
+
+    def __repr__(self):
+        repr_str = (f'{self.__class__.__name__}('
+                    f'input_image_key={self.input_image_key}, '
+                    f"input_depth_key='{self.input_depth_key}', "
+                    f'output_key={self.output_key})')
         return repr_str
 
 
