@@ -250,7 +250,60 @@ class SingleStageInstanceSegmentor(BaseDetector):
         return bbox_results, mask_results
 
     def aug_test(self, imgs, img_metas, rescale=False):
-        raise NotImplementedError
+        """Test function with test time augmentation.
+
+        Args:
+            imgs (list[Tensor]): the outer list indicates test-time
+                augmentations and inner Tensor should have a shape NxCxHxW,
+                which contains all images in the batch.
+            img_metas (list[list[dict]]): the outer list indicates test-time
+                augs (multiscale, flip, etc.) and the inner list indicates
+                images in a batch. each dict has image information.
+            rescale (bool, optional): Whether to rescale the results.
+                Defaults to False.
+
+        Returns:
+            list(tuple): Formatted bbox and mask results of multiple \
+                images. The outer list corresponds to each image. \
+                Each tuple contains two type of results of single image:
+
+                - bbox_results (list[np.ndarray]): BBox results of
+                  single image. The list corresponds to each class.
+                  each ndarray has a shape (N, 5), N is the number of
+                  bboxes with this category, and last dimension
+                  5 arrange as (x1, y1, x2, y2, scores).
+                - mask_results (list[np.ndarray]): Mask results of
+                  single image. The list corresponds to each class.
+                  each ndarray has a shape (N, img_h, img_w), N
+                  is the number of masks with this category.
+        """
+
+        assert hasattr(self.mask_head, 'aug_test'), \
+            f'{self.mask_head.__class__.__name__}' \
+            ' does not support test-time augmentation'
+
+        if self.bbox_head:
+            assert hasattr(self.bbox_head, 'aug_test'), \
+                f'{self.bbox_head.__class__.__name__}' \
+                ' does not support test-time augmentation'
+
+        feats = self.extract_feats(imgs)
+        if self.bbox_head:
+            outs = self.bbox_head(feats)
+            # results_list is list[obj:`InstanceData`]
+            results_list = self.bbox_head.get_results(
+                *outs, img_metas=img_metas, cfg=self.test_cfg, rescale=rescale)
+        else:
+            results_list = None
+
+        results_list = self.mask_head.aug_test(
+            feats, img_metas, rescale=rescale, instances_list=results_list)
+
+        format_results_list = []
+        for results in results_list:
+            format_results_list.append(self.format_results(results))
+
+        return format_results_list
 
     def show_result(self,
                     img,

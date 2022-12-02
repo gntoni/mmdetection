@@ -111,6 +111,19 @@ class BaseMaskHead(BaseModule, metaclass=ABCMeta):
             **kwargs)
         return results_list
 
+    def aug_test(self,
+                 feats,
+                 img_metas,
+                 rescale=False,
+                 instances_list=None,
+                 **kwargs):
+        """Test with augmentations.
+
+        If rescale is False, then returned bboxes and masks will fit the scale
+        of imgs[0].
+        """
+
+
     def onnx_export(self, img, img_metas):
         raise NotImplementedError(f'{self.__class__.__name__} does '
                                   f'not support ONNX EXPORT')
