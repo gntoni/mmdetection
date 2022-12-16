@@ -12,7 +12,7 @@ from .loading import (FilterAnnotations, LoadAnnotations, LoadImageFromFile,
                       LoadPanopticAnnotations, LoadProposals)
 from .test_time_aug import MultiScaleFlipAug
 from .transforms import (Albu, CopyPaste, CutOut, Expand, MinIoURandomCrop,
-                         MixUp, Mosaic, Normalize, Pad, PhotoMetricDistortion,
+                         MixUp, Mosaic, NoDepth, Normalize, Pad, PhotoMetricDistortion,
                          RandomAffine, RandomCenterCropPad, RandomCrop,
                          RandomFlip, RandomShift, Resize, SegRescale,
                          YOLOXHSVRandomAug)

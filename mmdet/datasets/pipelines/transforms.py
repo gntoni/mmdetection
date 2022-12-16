@@ -676,6 +676,38 @@ class Pad:
 
 
 @PIPELINES.register_module()
+class NoDepth:
+    """Zeroes-out the depth channel with a given probability.
+
+    Added key is "no_depth".
+
+    Args:
+        prob (float): Probability of removing depth (0 to 1).
+    """
+
+    def __init__(self, prob, input_key='depth'):
+        assert 0.0 <= prob <= 1.0
+        self.prob = prob
+        self.input_key = input_key
+
+    def __call__(self, results):
+        """Call function to zero-out depth.
+
+        Args:
+            results (dict): Result dict from loading pipeline.
+
+        Returns:
+            dict: results with updated depth, 'no_depth' key is added and is true if
+                the depth has been zeroed out.
+        """
+        if np.random.rand() < self.prob:
+            results[self.input_key] = np.zeros_like(results[self.input_key])
+            results['no_depth'] = True
+        else:
+            results['no_depth'] = False
+
+
+@PIPELINES.register_module()
 class Normalize:
     """Normalize the image.
 

@@ -90,6 +90,7 @@ train_pipeline = [
          skip_img_without_anno=True),
     dict(type='MergeRGBD'),
     dict(type='Normalize', **img_norm_cfg),
+    dict(type='NoDepth', prob=0.15),
     dict(type='RandomFlip', flip_ratio=0.5),
     dict(type='Pad', size_divisor=32),
     dict(type='DefaultFormatBundle'),
