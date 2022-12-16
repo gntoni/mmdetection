@@ -6,7 +6,7 @@ from mmcv.cnn import VGG
 from mmcv.runner.hooks import HOOKS, Hook
 
 from mmdet.datasets.builder import PIPELINES
-from mmdet.datasets.pipelines import (LoadAnnotations, LoadImageFromFile,
+from mmdet.datasets.pipelines import (LoadAnnotations, LoadImageFromFile, LoadRGBDImageFromFiles,
                                       LoadPanopticAnnotations, LoadMultiChannelImageFromFiles)
 from mmdet.models.dense_heads import GARPNHead, RPNHead
 from mmdet.models.roi_heads.mask_heads import FusedSemanticHead
@@ -105,6 +105,7 @@ def get_loading_pipeline(pipeline):
         obj_cls = PIPELINES.get(cfg['type'])
         # TODO：use more elegant way to distinguish loading modules
         if obj_cls is not None and obj_cls in (LoadImageFromFile,
+                                               LoadRGBDImageFromFiles,
                                                LoadMultiChannelImageFromFiles,
                                                LoadAnnotations,
                                                LoadPanopticAnnotations):
