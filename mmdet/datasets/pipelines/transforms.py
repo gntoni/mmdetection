@@ -703,8 +703,10 @@ class NoDepth:
         if np.random.rand() < self.prob:
             results[self.input_key] = np.zeros_like(results[self.input_key])
             results['no_depth'] = True
+            return results
         else:
             results['no_depth'] = False
+            return results
 
 
 @PIPELINES.register_module()
